@@ -1,0 +1,125 @@
+[
+  {
+    "id": "japanese-sashimi-plate-0502",
+    "slug": "japanese-sashimi-plate",
+    "name": "japanese sashimi plate",
+    "japaneseName": "青瓷刻花盘",
+    "style": "Arita-yaki",
+    "origin": "东京",
+    "price": 8005,
+    "description": "a very nice sashimi serving plate with engraving patterns ",
+    "dimensions": {
+      "height": "10cm",
+      "diameter": "12cm",
+      "weight": "200g",
+      "capacity": "150ml"
+    },
+    "careInstructions": [
+      "Hand-wash recommended",
+      "Do not microwave",
+      "Allow to dry thoroughly"
+    ],
+    "isOneOfAKind": true,
+    "images": [
+      "/uploads/products/1789313213609-20191021_192705.jpg",
+      "/uploads/products/1789313237714-20191021_193121.jpg"
+    ]
+  },
+  {
+    "id": "japanese-green-bowl-7878",
+    "slug": "japanese-green-bowl",
+    "name": "Japanese green bowl ",
+    "japaneseName": " 青釉小碗",
+    "style": "Arita-yaki",
+    "origin": "Kyoto ",
+    "price": 7500,
+    "description": "an elegant Japanese small bowl for 蒸物",
+    "dimensions": {
+      "height": "7.5cm",
+      "diameter": "12cm",
+      "weight": "245g",
+      "capacity": "220ml"
+    },
+    "careInstructions": [
+      "Hand-wash recommended",
+      "Do not microwave",
+      "Allow to dry thoroughly"
+    ],
+    "isOneOfAKind": true,
+    "images": [
+      "/uploads/products/1789313004006-20191021_190954.jpg"
+    ]
+  },
+  {
+    "id": "arita-celadon-sencha-bowl",
+    "slug": "arita-celadon-sencha-bowl",
+    "name": "Pale Celadon Tea Bowl",
+    "japaneseName": "青磁煎茶碗",
+    "style": "Arita-yaki",
+    "origin": "Arita, Saga Prefecture",
+    "price": 6800,
+    "description": "Hand-thrown porcelain glazed with a soft pale iron-blue celadon. Fired at high temperatures in a reducing atmosphere to produce subtle crystalline crazing and a smooth jade-like finish.",
+    "dimensions": {
+      "height": "6.2 cm (2.4 in)",
+      "diameter": "9.8 cm (3.8 in)",
+      "weight": "165 g",
+      "capacity": "180 ml (6.1 fl oz)"
+    },
+    "careInstructions": [
+      "Hand-wash with mild non-abrasive detergent",
+      "Not recommended for microwave use",
+      "Air dry completely before storing"
+    ],
+    "isOneOfAKind": false,
+    "images": [
+      "https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&q=80&w=1200",
+      "https://images.unsplash.com/photo-1610701596007-11502861dcfa?auto=format&fit=crop&q=80&w=1200"
+    ]
+  },
+  {
+    "id": "hasami-matte-plate-chalk",
+    "slug": "hasami-matte-plate-chalk",
+    "name": "Mineral Chalk Serving Dish",
+    "japaneseName": "波佐見平皿",
+    "style": "Hasami-yaki",
+    "origin": "Hasami, Nagasaki Prefecture",
+    "price": 5200,
+    "description": "Characterized by a clean, geometric silhouette and a distinctive chalk-matte outer surface. Made from a precise blend of crushed Amakusa pottery stone and natural clay for high durability.",
+    "dimensions": {
+      "height": "2.5 cm (1.0 in)",
+      "diameter": "22.0 cm (8.6 in)",
+      "weight": "440 g"
+    },
+    "careInstructions": [
+      "Dishwasher and microwave safe",
+      "Avoid sudden drastic temperature shifts (thermal shock)"
+    ],
+    "isOneOfAKind": false,
+    "images": [
+      "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&q=80&w=1200"
+    ]
+  },
+  {
+    "id": "kutani-sometsuke-gourd-vase",
+    "slug": "kutani-sometsuke-gourd-vase",
+    "name": "Sometsuke Gourd Vase",
+    "japaneseName": "染付瓢箪花入",
+    "style": "Kutani-yaki",
+    "origin": "Kaga, Ishikawa Prefecture",
+    "price": 14500,
+    "description": "Traditional double-gourd silhouette brushed with deep natural cobalt underglaze (sometsuke) beneath a high-gloss transparent glaze.",
+    "dimensions": {
+      "height": "18.5 cm (7.3 in)",
+      "diameter": "10.0 cm (3.9 in)",
+      "weight": "520 g"
+    },
+    "careInstructions": [
+      "Hand-wash only",
+      "Rinse with warm water and wipe gently with a soft cloth"
+    ],
+    "isOneOfAKind": true,
+    "images": [
+      "https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&q=80&w=1200"
+    ]
+  }
+]
