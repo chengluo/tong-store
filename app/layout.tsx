@@ -4,7 +4,7 @@ import Navbar from '../components/Navbar';
 import CartDrawer from '../components/CartDrawer';
 
 export const metadata: Metadata = {
-  title: 'Komorebi Kiln — Japanese Porcelain & Vessels',
+  title: 'Tong\'s store — Japanese Porcelain & Vessels',
   description: 'Curated Japanese ceramics and porcelain from heritage kilns.',
 };
 
