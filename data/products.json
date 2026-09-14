@@ -1,5 +1,30 @@
 [
   {
+    "id": "red-japanese-bowel-with-lid-3120",
+    "slug": "red-japanese-bowel-with-lid",
+    "name": "Red Japanese bowel with lid ",
+    "japaneseName": "团寿盖碗",
+    "style": "Arita-yaki",
+    "origin": "京都",
+    "price": 9000,
+    "description": "A perfect small bowel for soup, rice or steamed servings ",
+    "dimensions": {
+      "height": "8cm",
+      "diameter": "12cm",
+      "weight": "200g",
+      "capacity": "120ml"
+    },
+    "careInstructions": [
+      "Hand-wash recommended",
+      "Do not microwave",
+      "Allow to dry thoroughly"
+    ],
+    "isOneOfAKind": false,
+    "images": [
+      "https://rzknumahmf7vbjab.public.blob.vercel-storage.com/products/1789416626233-0D81CC30-A78B-4635-9212-9131A712C49B-Pl7MxOxjjRuZkVyuxSkY5XQkm3FKBo.jpeg"
+    ]
+  },
+  {
     "id": "japanese-sashimi-plate-0502",
     "slug": "japanese-sashimi-plate",
     "name": "japanese sashimi plate",
