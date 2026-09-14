@@ -1,5 +1,4 @@
-import { readFile, writeFile } from 'fs/promises';
-import path from 'path';
+import { Redis } from '@upstash/redis';
 import type { Product } from '@/types/product';
 import initialProducts from './products.json';
 
@@ -15,15 +14,31 @@ export const PRODUCT_MAP: Record<string, Product> = PRODUCTS.reduce(
   {} as Record<string, Product>
 );
 
-const dbPath = path.join(process.cwd(), 'data', 'products.json');
+const KV_KEY = 'komorebi_products';
+
+// Auto-reads UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN
+const redis =
+  process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
+    ? Redis.fromEnv()
+    : null;
 
 export async function getProducts(): Promise<Product[]> {
+  if (!redis) {
+    return initialProducts as Product[];
+  }
+
   try {
-    const data = await readFile(dbPath, 'utf8');
-    return JSON.parse(data) as Product[];
+    const products = await redis.get<Product[]>(KV_KEY);
+    if (products && Array.isArray(products) && products.length > 0) {
+      return products;
+    }
+
+    // Seed Redis with initial JSON catalog if empty
+    await redis.set(KV_KEY, initialProducts);
+    return initialProducts as Product[];
   } catch (err) {
-    console.error('Error reading products.json, returning empty array:', err);
-    return [];
+    console.error('Upstash Redis read error, falling back to local seed:', err);
+    return initialProducts as Product[];
   }
 }
 
@@ -44,7 +59,14 @@ export async function saveProduct(newProduct: Product): Promise<Product[]> {
     updated = [newProduct, ...products];
   }
 
-  await writeFile(dbPath, JSON.stringify(updated, null, 2), 'utf8');
+  if (redis) {
+    try {
+      await redis.set(KV_KEY, updated);
+    } catch (err) {
+      console.error('Failed to persist product to Upstash Redis:', err);
+    }
+  }
+
   return updated;
 }
 
