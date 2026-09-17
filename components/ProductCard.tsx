@@ -25,7 +25,6 @@ export default function ProductCard({ product }: ProductCardProps) {
       name: product.name,
       price: product.price,
       imageUrl: product.images[0],
-      quantity: 1,
     });
     openCart();
   };
