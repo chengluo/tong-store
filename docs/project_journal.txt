@@ -1,0 +1,292 @@
+mkdir -p my-app/docs
+cat << 'EOF' > my-app/docs/project_journal.txt
+# Project Documentation: Komorebi Kiln (Japanese Porcelain E-Commerce)
+
+An artisanal e-commerce storefront for handcrafted Japanese ceramics and porcelain (Arita-yaki, Hasami, Mino-ware, Kutani, and Bizen). Built with a minimalist Japanese aesthetic (warm stone tones, serif typography, negative space) and an integrated Stripe payment pipeline.
+
+---
+
+## 1. Technology Stack
+
+* **Framework:** Next.js (App Router, React Server Components)
+* **Language:** TypeScript
+* **Styling:** Tailwind CSS (Custom palette: #FAF8F5, #FDFBF7, warm stone neutrals)
+* **State Management:** Zustand (with localStorage persistence middleware)
+* **Payment Processing:** Stripe Server SDK (stripe) + Stripe Hosted Checkout Sessions
+* **Icons:** Inline SVG & Lucide React (lucide-react)
+* **Local Storage & Database:** File-system JSON DB (data/products.json) + Node fs/promises
+* **Media Management:** Local file uploads (public/uploads/products/) via Next.js Route Handlers
+
+---
+
+## 2. Directory & File Architecture
+
+japanese-porcelain/
+├── app/
+│   ├── api/
+│   │   ├── checkout/
+│   │   │   └── route.ts         # Stripe Checkout Session creation & server price validation
+│   │   ├── products/
+│   │   │   └── route.ts         # GET (list all) & POST (create new piece) API
+│   │   ├── upload/
+│   │   │   └── route.ts         # Multipart file upload handler (saves images to disk)
+│   │   └── webhook/
+│   │       └── route.ts         # Stripe webhook listener for order fulfillment
+│   ├── admin/
+│   │   └── page.tsx             # Studio dashboard: image upload + product creation form
+│   ├── products/
+│   │   └── [slug]/
+│   │       └── page.tsx         # Dynamic Product Detail Page (PDP) with static params
+│   ├── success/
+│   │   └── page.tsx             # Post-checkout order confirmation & receipt screen
+│   ├── globals.css              # Global styling & Tailwind directives
+│   ├── layout.tsx               # Root layout: mounts Navbar, CartDrawer, suppressHydrationWarning
+│   └── page.tsx                 # Editorial catalog homepage with category filter tabs
+├── components/
+│   ├── CartDrawer.tsx           # Off-canvas slide-over shopping bag
+│   ├── ClearCartOnSuccess.tsx   # Client component that empties Zustand cart upon purchase
+│   ├── ImageUploader.tsx        # Drag-and-drop local image uploader component
+│   ├── Navbar.tsx               # Header with studio brand and dynamic item counter badge
+│   ├── ProductCard.tsx          # Catalog item card with hover zoom & quick-add (+)
+│   └── ProductDetailClient.tsx  # Interactive PDP view (gallery switcher, specs, buy now)
+├── data/
+│   ├── products.json            # Persistent JSON database of ceramic works
+│   └── products.ts              # Server-side data access layer (getProducts, saveProduct)
+├── public/
+│   └── uploads/
+│       └── products/            # Local disk storage directory for uploaded ceramic photos
+├── stores/
+│   └── useCartStore.ts          # Zustand store for line items, quantities, and subtotal
+├── types/
+│   └── product.ts               # Browser/client-safe TypeScript interfaces for Product
+├── .env.local                   # API keys & site URLs
+├── next.config.ts               # Next.js config (Unsplash image domain whitelist)
+└── package.json
+
+---
+
+## 3. What Has Been Built & Configured
+
+### A. Core Architecture & Styling
+* Scaffolded Next.js App Router with TypeScript and Tailwind CSS.
+* Separated Data Types (types/product.ts): Prevented client browser bundles from importing server-only Node modules (fs).
+* Resolved Hydration Warnings: Added suppressHydrationWarning to <html> and <body> in app/layout.tsx to handle browser extensions (e.g., Grammarly).
+
+### B. Product Catalog & Presentation
+* Homepage (app/page.tsx):
+  - Editorial hero section with collection overview.
+  - Tradition/Style filter tabs (Arita-yaki, Hasami-yaki, Mino-yaki, Bizen-yaki, Kutani-yaki).
+  - Asynchronous fetching from /api/products with loading state.
+* Product Card (components/ProductCard.tsx):
+  - Subtle hover zoom and "One of a Kind" badge support.
+  - Direct + quick-add button wired into Zustand.
+* Dynamic PDP (app/products/[slug]/page.tsx & ProductDetailClient.tsx):
+  - Pre-rendered static paths via generateStaticParams.
+  - Dynamic SEO metadata generation.
+  - Multi-angle image thumbnail switcher.
+  - Physical specifications breakdown (Height, Diameter, Weight, Fluid Capacity) and traditional care instructions.
+  - Dual actions: "Add to Selection" and immediate "Direct Checkout".
+
+### C. Shopping Cart (Zustand)
+* Store (stores/useCartStore.ts):
+  - Manages item IDs, names, prices (in integer cents), thumbnails, and quantities.
+  - Persists items across sessions via localStorage under key porcelain-cart-storage.
+  - Auto-calculates subtotal and item count.
+* Slide-Over Drawer (components/CartDrawer.tsx):
+  - Off-canvas slide-out panel with smooth transition curves.
+  - Background scroll locking when open.
+  - In-cart quantity adjustment and item removal.
+
+### D. Stripe Checkout & Payment Flow
+* Checkout API (app/api/checkout/route.ts):
+  - Validates item IDs on the server against the local database (getProducts()).
+  - Restricts checkout to card payments and supported international shipping countries (US, CA, GB, FR, DE, JP, AU).
+  - Resolves images dynamically: uses external URLs or applies a fallback public ceramic placeholder during localhost testing (preventing Stripe 400 errors).
+* Order Confirmation (app/success/page.tsx):
+  - Reads session_id query parameter and verifies it on the server using Stripe's SDK.
+  - Renders an itemized collector receipt and total settled amount.
+  - Triggers ClearCartOnSuccess to empty the cart once paid.
+* Webhook Fulfillment (app/api/webhook/route.ts):
+  - Verifies stripe-signature using STRIPE_WEBHOOK_SECRET.
+  - Handles checkout.session.completed to log or dispatch orders.
+
+### E. Studio Asset & Product Management (Admin)
+* Upload Route (app/api/upload/route.ts):
+  - Receives multipart FormData via POST.
+  - Validates MIME types (JPEG, PNG, WEBP, AVIF).
+  - Generates timestamped, sanitized filenames and writes them to public/uploads/products/.
+* Database API (app/api/products/route.ts):
+  - Automatically generates URL slugs from English titles.
+  - Converts standard decimal prices (e.g., $68.00) to integer cents (6800) for Stripe.
+  - Persists new works into data/products.json.
+* Admin Dashboard (app/admin/page.tsx):
+  - Drag-and-drop local image uploader (components/ImageUploader.tsx).
+  - Form for title, Japanese Kanji, style, region, price, dimensions, and care notes.
+  - Live inventory sidebar displaying all active catalog pieces with direct storefront links.
+
+---
+
+## 4. Environment Variables (.env.local)
+
+STRIPE_SECRET_KEY=sk_test_51...
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_51...
+STRIPE_WEBHOOK_SECRET=whsec_...
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
+
+---
+
+## 5. Helpful Commands Reference
+
+### Start Development Server
+npm run dev
+
+### Clear Next.js Build Cache
+rm -rf .next
+npm run dev
+
+### Forward Stripe Webhooks Locally
+stripe listen --forward-to localhost:3000/api/webhook
+
+### Trigger a Test Payment Event via Stripe CLI
+stripe trigger checkout.session.completed
+
+---
+
+## 6. Known Considerations / Next Potential Milestones
+
+1. Production Image Hosting: Local /uploads/ works for local development. For production deployment (e.g., Vercel), move image storage to a cloud CDN (AWS S3, Cloudinary, or Supabase Storage) as Vercel's filesystem is ephemeral/read-only at runtime.
+2. Admin Authentication: Add basic authentication or Next.js middleware to lock down /admin so visitors cannot access inventory management.
+3. Inventory Decrementing: Connect inventory counts in products.json or a SQL database to decrement automatically when checkout.session.completed fires.
+EOF
+
+
+# Project Documentation: Komorebi Kiln (Japanese Porcelain E-Commerce)
+
+An artisanal e-commerce storefront for handcrafted Japanese ceramics and porcelain (Arita-yaki, Hasami, Mino-ware, Kutani, and Bizen). Built with a minimalist Japanese aesthetic (warm stone tones, serif typography, negative space) and an integrated Stripe payment pipeline.
+
+---
+
+## 1. Technology Stack
+
+* **Framework:** Next.js (App Router, React Server Components)
+* **Language:** TypeScript
+* **Styling:** Tailwind CSS (Custom palette: #FAF8F5, #FDFBF7, warm stone neutrals)
+* **State Management:** Zustand (with localStorage persistence middleware)
+* **Payment Processing:** Stripe Server SDK (stripe) + Stripe Hosted Checkout Sessions
+* **Icons:** Inline SVG & Lucide React (lucide-react)
+* **Data Layer & Persistence:** Upstash Redis (@upstash/redis) with data/products.json local fallback
+* **Media & Asset Management:** Vercel Blob Edge Storage (@vercel/blob) with local disk fallback (/public/uploads/)
+* **Domain & Hosting:** Vercel Serverless Platform mapped to custom domain www.appos.co.uk via GoDaddy DNS
+
+---
+
+## 2. Directory & File Architecture
+
+japanese-porcelain/
+├── app/
+│   ├── api/
+│   │   ├── checkout/
+│   │   │   └── route.ts         # Stripe Checkout session creator & dynamic image fallback
+│   │   ├── products/
+│   │   │   └── route.ts         # GET & POST API with on-demand cache revalidation
+│   │   ├── upload/
+│   │   │   └── route.ts         # Hybrid image uploader (Vercel Blob CDN + local fallback)
+│   │   └── webhook/
+│   │       └── route.ts         # Stripe webhook listener for checkout.session.completed
+│   ├── admin/
+│   │   └── page.tsx             # Studio dashboard: image upload + product creation form
+│   ├── products/
+│   │   └── [slug]/
+│   │       └── page.tsx         # Dynamic PDP with dynamicParams & on-demand rendering
+│   ├── success/
+│   │   └── page.tsx             # Post-checkout order confirmation & receipt screen
+│   ├── globals.css              # Global styling & Tailwind directives
+│   ├── layout.tsx               # Root layout: mounts Navbar, CartDrawer, suppressHydrationWarning
+│   └── page.tsx                 # Editorial catalog homepage with category filter tabs
+├── components/
+│   ├── CartDrawer.tsx           # Off-canvas slide-over shopping bag
+│   ├── ClearCartOnSuccess.tsx   # Client component that empties Zustand cart upon purchase
+│   ├── ImageUploader.tsx        # Drag-and-drop local image uploader component
+│   ├── Navbar.tsx               # Header with studio brand and dynamic item counter badge
+│   ├── ProductCard.tsx          # Catalog item card with hover zoom & quick-add (+)
+│   └── ProductDetailClient.tsx  # Interactive PDP view (gallery switcher, specs, buy now)
+├── data/
+│   ├── products.json            # Seed and fallback JSON catalog of ceramic works
+│   └── products.ts              # Upstash Redis data access layer with local seed fallback
+├── middleware.ts                # HTTP Basic Auth protecting /admin route
+├── public/
+│   └── uploads/
+│       └── products/            # Local disk storage directory for uploaded ceramic photos
+├── stores/
+│   └── useCartStore.ts          # Zustand store for line items, quantities, and subtotal
+├── types/
+│   └── product.ts               # Browser/client-safe TypeScript interfaces for Product
+├── .env.local                   # API keys & site URLs
+├── next.config.ts               # Next.js config (Unsplash & Vercel Blob domain whitelists)
+└── package.json
+
+---
+
+## 3. Engineering Changelog & Problem Resolutions
+
+### A. TypeScript Decoupling & Server-Module Leaks
+* **Problem:** Importing data functions directly into client components pulled Node.js fs/promises into client bundles, triggering Module not found: Can't resolve 'fs'.
+* **Fix:** Split data types into a pure types/product.ts file so client components (e.g., page.tsx, ProductCard.tsx) never import server-side runtime files.
+
+### B. Hydration Warning Suppression
+* **Problem:** Extensions such as Grammarly injected data attributes into <body> before hydration, causing React SSR hydration mismatch warnings.
+* **Fix:** Added suppressHydrationWarning to both <html> and <body> in app/layout.tsx.
+
+### C. Public Checkout Previews & Image Handling
+* **Problem:** Stripe Hosted Checkout cannot render images hosted on localhost/private network paths, failing line item image previews.
+* **Fix:** Configured app/api/checkout/route.ts to provide a reliable public ceramics placeholder when on localhost, and to pass full public CDN URLs in production.
+
+### D. Production Deployment & Custom Domain
+* **Domain:** www.appos.co.uk (registered via GoDaddy).
+* **DNS Configuration:**
+  - CNAME (www) -> cname.vercel-dns.com
+  - A Record (@) -> 76.76.21.21
+* **Webhook Routing:** Pointed live Stripe event listeners to https://www.appos.co.uk/api/webhook.
+
+### E. Admin Security via Edge Middleware
+* **Implementation:** Created root middleware.ts checking Authorization headers against ADMIN_USER and ADMIN_PASSWORD.
+* **Robust Decoding:** Handled base64 parsing via Buffer to prevent truncation issues with passwords containing colons or symbols.
+
+### F. Cloud Persistence Migration (Upstash Redis)
+* **Problem:** Vercel serverless environments enforce a read-only filesystem (/var/task), throwing EROFS crashes when trying to write to products.json.
+* **Migration:** Deprecated @vercel/kv in favor of official @upstash/redis.
+* **Resilience:** Implemented data/products.ts with automatic failover to data/products.json if credentials are unavailable, and built-in auto-seeding when Redis is unpopulated.
+
+### G. Edge Asset Storage (Vercel Blob)
+* **Implementation:** Integrated @vercel/blob in app/api/upload/route.ts with a local fallback for offline development.
+* **Configuration:** Whitelisted *.public.blob.vercel-storage.com under images.remotePatterns in next.config.ts.
+
+### H. 404 Route & Cache Invalidation Resolution
+* **Problem:** Newly created items in Redis threw 404 "Page Not Found" because Next.js pre-rendered dynamic paths only at build time.
+* **Fix:**
+  - Added export const dynamicParams = true and export const dynamic = 'force-dynamic' to app/products/[slug]/page.tsx.
+  - Added on-demand revalidatePath calls in app/api/products/route.ts for /, /admin, and /products/[slug].
+
+---
+
+## 4. Current Environment Variables Configuration (.env.local)
+
+```env
+# Stripe Payment Gateway
+STRIPE_SECRET_KEY=sk_test_...
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+
+# Site Domain URL
+NEXT_PUBLIC_SITE_URL=[https://www.appos.co.uk](https://www.appos.co.uk)
+
+# Admin HTTP Basic Auth
+ADMIN_USER=your_admin_user
+ADMIN_PASSWORD=your_admin_password
+
+# Vercel Blob CDN Storage
+BLOB_READ_WRITE_TOKEN=vercel_blob_rw_...
+
+# Upstash Redis Persistence
+UPSTASH_REDIS_REST_URL=[https://...upstash.io](https://...upstash.io)
+UPSTASH_REDIS_REST_TOKEN=AXXX...

@@ -1,3 +1,4 @@
+// types/product.ts
 export interface Product {
   id: string;
   slug: string;
@@ -6,6 +7,7 @@ export interface Product {
   style: 'Arita-yaki' | 'Hasami-yaki' | 'Mino-yaki' | 'Bizen-yaki' | 'Kutani-yaki' | string;
   origin: string;
   price: number; // in cents
+  stock?: number; // inventory count
   description: string;
   dimensions: {
     height: string;

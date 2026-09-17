@@ -1,4 +1,6 @@
+// app/api/products/route.ts
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { getProducts, saveProduct } from '@/data/products';
 import type { Product } from '@/types/product';
 
@@ -34,6 +36,7 @@ export async function POST(request: Request) {
       style: body.style || 'Arita-yaki',
       origin: body.origin || 'Japan',
       price: Math.round(Number(body.price) * 100),
+      stock: body.stock !== undefined ? Math.max(0, parseInt(body.stock, 10)) : 1,
       description: body.description || '',
       dimensions: {
         height: body.height || 'N/A',
@@ -50,9 +53,42 @@ export async function POST(request: Request) {
 
     await saveProduct(newProduct);
 
+    revalidatePath('/');
+    revalidatePath(`/products/${slug}`);
+    revalidatePath('/admin');
+
     return NextResponse.json({ success: true, product: newProduct }, { status: 201 });
   } catch (error: any) {
     console.error('Error creating product:', error);
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const { id, stock } = await request.json();
+
+    if (!id || stock === undefined || stock < 0) {
+      return NextResponse.json({ error: 'Valid product ID and non-negative stock count are required.' }, { status: 400 });
+    }
+
+    const products = await getProducts();
+    const targetProduct = products.find((p) => p.id === id);
+
+    if (!targetProduct) {
+      return NextResponse.json({ error: 'Product not found.' }, { status: 404 });
+    }
+
+    targetProduct.stock = Number(stock);
+    await saveProduct(targetProduct);
+
+    revalidatePath('/');
+    revalidatePath(`/products/${targetProduct.slug}`);
+    revalidatePath('/admin');
+
+    return NextResponse.json({ success: true, product: targetProduct });
+  } catch (error: any) {
+    console.error('Error modifying stock:', error);
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
   }
 }

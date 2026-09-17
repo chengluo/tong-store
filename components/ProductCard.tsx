@@ -1,68 +1,89 @@
+// components/ProductCard.tsx
 'use client';
 
 import Image from 'next/image';
 import Link from 'next/link';
-import type { Product } from '@/types/product';
 import { useCartStore } from '@/stores/useCartStore';
+import type { Product } from '@/types/product';
 
-export default function ProductCard({ product }: { product: Product }) {
+interface ProductCardProps {
+  product: Product;
+}
+
+export default function ProductCard({ product }: ProductCardProps) {
   const addItem = useCartStore((state) => state.addItem);
+  const openCart = useCartStore((state) => state.openCart);
+
+  const isOutOfStock = product.stock !== undefined && product.stock <= 0;
 
   const handleQuickAdd = (e: React.MouseEvent) => {
     e.preventDefault();
+    if (isOutOfStock) return;
+
     addItem({
       id: product.id,
       name: product.name,
       price: product.price,
       imageUrl: product.images[0],
-      origin: product.origin,
+      quantity: 1,
     });
+    openCart();
   };
 
   return (
-    <article className="group flex flex-col font-serif">
-      <Link href={`/products/${product.slug}`} className="block relative aspect-4/5 w-full overflow-hidden bg-stone-100">
-        <Image
-          src={product.images[0]}
-          alt={product.name}
-          fill
-          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-          className="object-cover object-center transition-transform duration-700 ease-out group-hover:scale-105"
-        />
-
-        {product.isOneOfAKind && (
-          <span className="absolute top-3 left-3 bg-[#FAF8F5]/90 backdrop-blur-xs text-[10px] uppercase tracking-[0.2em] px-2 py-1 font-sans text-stone-700">
-            One of a Kind
-          </span>
+    <div className="group flex flex-col justify-between">
+      <Link href={`/products/${product.slug}`} className="block relative overflow-hidden bg-stone-100 aspect-square">
+        {product.images[0] && (
+          <Image
+            src={product.images[0]}
+            alt={product.name}
+            fill
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            className={`object-cover transition-transform duration-700 ease-out group-hover:scale-105 ${
+              isOutOfStock ? 'grayscale opacity-60' : ''
+            }`}
+          />
         )}
 
-        <button
-          onClick={handleQuickAdd}
-          aria-label={`Add ${product.name} to cart`}
-          className="absolute bottom-3 right-3 p-2.5 bg-[#FAF8F5]/90 text-stone-900 backdrop-blur-xs transition-all duration-300 opacity-0 group-hover:opacity-100 hover:bg-stone-900 hover:text-stone-100 shadow-xs"
-        >
-          <svg className="w-4 h-4 stroke-[1.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-          </svg>
-        </button>
-      </Link>
-
-      <div className="mt-4 flex flex-col space-y-1">
-        <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.2em] text-stone-400 font-sans">
-          <span>{product.style}</span>
-          <span className="font-serif italic capitalize text-stone-400">{product.japaneseName}</span>
+        {/* Status Badges */}
+        <div className="absolute top-3 left-3 flex flex-col gap-1.5 z-10">
+          {isOutOfStock ? (
+            <span className="bg-stone-900 text-stone-100 text-[10px] tracking-[0.2em] uppercase px-2.5 py-1 font-mono">
+              Sold Out
+            </span>
+          ) : product.isOneOfAKind ? (
+            <span className="bg-stone-100/90 backdrop-blur-xs text-stone-800 text-[10px] tracking-[0.2em] uppercase px-2 py-0.5 border border-stone-200">
+              One of a Kind
+            </span>
+          ) : null}
         </div>
 
-        <h3 className="text-base font-light text-stone-900 tracking-wide">
-          <Link href={`/products/${product.slug}`}>
-            {product.name}
-          </Link>
-        </h3>
+        {/* Quick-add button */}
+        {!isOutOfStock && (
+          <button
+            onClick={handleQuickAdd}
+            aria-label={`Add ${product.name} to cart`}
+            className="absolute bottom-3 right-3 w-9 h-9 bg-white/95 backdrop-blur-xs text-stone-900 rounded-full flex items-center justify-center opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 hover:bg-stone-900 hover:text-white shadow-xs"
+          >
+            <span className="text-lg leading-none mb-0.5">+</span>
+          </button>
+        )}
+      </Link>
 
-        <p className="text-xs font-sans text-stone-600">
-          ${(product.price / 100).toFixed(2)}
-        </p>
+      <div className="mt-3 flex items-start justify-between text-xs">
+        <div>
+          <Link href={`/products/${product.slug}`} className="hover:underline">
+            <h3 className="font-serif text-sm text-stone-900">{product.name}</h3>
+          </Link>
+          <p className="text-stone-400 mt-0.5 font-light">{product.style}</p>
+        </div>
+        <div className="text-right">
+          <p className="font-mono text-stone-800">${(product.price / 100).toFixed(2)}</p>
+          {isOutOfStock && (
+            <p className="text-[10px] uppercase tracking-wider text-stone-400 mt-0.5">Unavailable</p>
+          )}
+        </div>
       </div>
-    </article>
+    </div>
   );
 }

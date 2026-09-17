@@ -28,6 +28,11 @@ export async function POST(request: Request) {
         throw new Error(`Invalid item ID: ${item.id}`);
       }
 
+      //block checkout if sold out
+      if (product.stock !== undefined && product.stock <= 0) {
+        throw new Error(`"${product.name}" is currently sold out.`);
+      }
+
       const formattedImages = product.images.map((img) =>
         img.startsWith('http') ? img : `${process.env.NEXT_PUBLIC_SITE_URL}${img}`
       );

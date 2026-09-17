@@ -1,190 +1,124 @@
+// components/CartDrawer.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import Image from 'next/image';
 import { useCartStore } from '@/stores/useCartStore';
-import { X, Minus, Plus, ShoppingBag } from 'lucide-react';
 
 export default function CartDrawer() {
-  const {
-    isOpen,
-    closeCart,
-    items,
-    removeItem,
-    updateQuantity,
-    getSubtotal,
-  } = useCartStore();
+  const { items, isOpen, closeCart, removeItem, updateQuantity } = useCartStore();
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const [isLoading, setIsLoading] = useState(false);
-  const [hasMounted, setHasMounted] = useState(false);
+  if (!isOpen) return null;
 
-  useEffect(() => {
-    setHasMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'unset';
-    }
-    return () => {
-      document.body.style.overflow = 'unset';
-    };
-  }, [isOpen]);
+  const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
   const handleCheckout = async () => {
-    if (items.length === 0) return;
-    setIsLoading(true);
+    setLoading(true);
+    setErrorMessage(null);
 
     try {
-      const response = await fetch('/api/checkout', {
+      const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items: items.map((item) => ({
-            id: item.id,
-            quantity: item.quantity,
-          })),
-        }),
+        body: JSON.stringify({ items }),
       });
 
-      const { url, error } = await response.json();
-      if (error) throw new Error(error);
-      if (url) window.location.href = url;
-    } catch (err: any) {
-      console.error('Checkout error:', err);
-      alert('Unable to proceed to checkout. Please try again.');
+      const data = await res.json();
+
+      if (!res.ok) {
+        // Displays exact stock message (e.g. "Piece is currently sold out")
+        setErrorMessage(data.error || 'Unable to proceed to checkout.');
+        return;
+      }
+
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch (err) {
+      console.error(err);
+      setErrorMessage('Network error while processing checkout.');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  if (!hasMounted) return null;
-
   return (
-    <div
-      className={`fixed inset-0 z-50 transition-all duration-300 ${
-        isOpen ? 'visible pointer-events-auto' : 'invisible pointer-events-none'
-      }`}
-      aria-labelledby="cart-heading"
-      role="dialog"
-      aria-modal="true"
-    >
-      <div
-        onClick={closeCart}
-        className={`fixed inset-0 bg-stone-900/40 backdrop-blur-xs transition-opacity duration-300 ${
-          isOpen ? 'opacity-100' : 'opacity-0'
-        }`}
-      />
+    <div className="fixed inset-0 z-50 overflow-hidden">
+      <div className="absolute inset-0 bg-stone-900/40 backdrop-blur-xs transition-opacity" onClick={closeCart} />
 
-      <div className="fixed inset-y-0 right-0 flex max-w-full pl-10">
-        <div
-          className={`w-screen max-w-md bg-[#FAF8F5] text-stone-900 shadow-2xl flex flex-col transform transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-            isOpen ? 'translate-x-0' : 'translate-x-full'
-          }`}
-        >
-          <div className="flex items-center justify-between px-6 py-6 border-b border-stone-200/80">
-            <h2
-              id="cart-heading"
-              className="font-serif text-lg tracking-wider uppercase font-light text-stone-900"
-            >
-              Curated Selection
-            </h2>
-            <button
-              onClick={closeCart}
-              className="p-1.5 text-stone-400 hover:text-stone-900 transition-colors"
-              aria-label="Close cart"
-            >
-              <X className="w-5 h-5 stroke-[1.5]" />
-            </button>
-          </div>
+      <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
+        <div className="w-screen max-w-md bg-[#FAF8F5] border-l border-stone-200 flex flex-col justify-between p-6 sm:p-8">
+          <div>
+            <div className="flex items-center justify-between border-b border-stone-200 pb-4 mb-6">
+              <h2 className="font-serif text-lg tracking-wide text-stone-900">Your Selection</h2>
+              <button onClick={closeCart} className="text-xs uppercase tracking-widest text-stone-400 hover:text-stone-900">
+                Close
+              </button>
+            </div>
 
-          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
-            {items.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-stone-400 space-y-4">
-                <ShoppingBag className="w-10 h-10 stroke-[1]" />
-                <p className="font-serif text-sm italic">Your bag is presently empty.</p>
+            {errorMessage && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-xs font-mono">
+                {errorMessage}
               </div>
+            )}
+
+            {items.length === 0 ? (
+              <p className="text-stone-400 text-xs font-serif italic py-12 text-center">Your bag is empty.</p>
             ) : (
-              items.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex gap-4 pb-6 border-b border-stone-200/60 last:border-b-0"
-                >
-                  <div className="relative w-20 h-24 bg-stone-100 shrink-0 overflow-hidden">
-                    <img
-                      src={item.imageUrl}
-                      alt={item.name}
-                      className="w-full h-full object-cover object-center"
-                    />
-                  </div>
-
-                  <div className="flex flex-col flex-1 justify-between font-sans">
-                    <div className="space-y-1">
-                      {item.origin && (
-                        <p className="text-[10px] tracking-widest uppercase text-stone-400">
-                          {item.origin}
-                        </p>
-                      )}
-                      <h3 className="font-serif text-sm font-normal text-stone-900 leading-snug">
-                        {item.name}
-                      </h3>
-                      <p className="text-xs text-stone-600">
-                        ${((item.price * item.quantity) / 100).toFixed(2)}
-                      </p>
+              <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+                {items.map((item) => (
+                  <div key={item.id} className="flex gap-4 border-b border-stone-100 pb-4">
+                    <div className="relative w-16 h-16 shrink-0 bg-stone-100 border border-stone-200">
+                      {item.imageUrl && <Image src={item.imageUrl} alt={item.name} fill className="object-cover" />}
                     </div>
-
-                    <div className="flex items-center justify-between pt-2">
-                      <div className="flex items-center border border-stone-300">
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-serif text-xs text-stone-900 truncate">{item.name}</h4>
+                      <p className="font-mono text-xs text-stone-500 mt-1">${(item.price / 100).toFixed(2)}</p>
+                      
+                      <div className="flex items-center gap-3 mt-2">
+                        <div className="flex items-center border border-stone-200 bg-white text-xs">
+                          <button
+                            onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                            className="px-2 py-0.5 hover:bg-stone-100"
+                          >
+                            -
+                          </button>
+                          <span className="px-2 font-mono">{item.quantity}</span>
+                          <button
+                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                            className="px-2 py-0.5 hover:bg-stone-100"
+                          >
+                            +
+                          </button>
+                        </div>
                         <button
-                          onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                          className="px-2 py-1 text-stone-500 hover:text-stone-900 hover:bg-stone-200/40"
-                          aria-label="Decrease quantity"
+                          onClick={() => removeItem(item.id)}
+                          className="text-[10px] uppercase tracking-wider text-stone-400 hover:text-red-600"
                         >
-                          <Minus className="w-3 h-3" />
-                        </button>
-                        <span className="px-2 text-xs font-mono">{item.quantity}</span>
-                        <button
-                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                          className="px-2 py-1 text-stone-500 hover:text-stone-900 hover:bg-stone-200/40"
-                          aria-label="Increase quantity"
-                        >
-                          <Plus className="w-3 h-3" />
+                          Remove
                         </button>
                       </div>
-
-                      <button
-                        onClick={() => removeItem(item.id)}
-                        className="text-[11px] text-stone-400 hover:text-rose-800 tracking-wider uppercase underline-offset-4 hover:underline transition-colors"
-                      >
-                        Remove
-                      </button>
                     </div>
                   </div>
-                </div>
-              ))
+                ))}
+              </div>
             )}
           </div>
 
           {items.length > 0 && (
-            <div className="border-t border-stone-200/80 px-6 py-6 space-y-4 bg-stone-50/50">
-              <div className="flex justify-between items-baseline font-serif">
-                <span className="text-xs uppercase tracking-widest text-stone-500 font-sans">
-                  Estimated Subtotal
-                </span>
-                <span className="text-lg font-normal text-stone-900">
-                  ${(getSubtotal() / 100).toFixed(2)}
-                </span>
+            <div className="border-t border-stone-200 pt-6">
+              <div className="flex justify-between text-xs font-mono mb-4">
+                <span>Subtotal</span>
+                <span>${(total / 100).toFixed(2)}</span>
               </div>
-              <p className="text-[11px] text-stone-500 font-sans leading-relaxed">
-                Taxes and insured ceramic packaging calculated during Stripe checkout.
-              </p>
               <button
                 onClick={handleCheckout}
-                disabled={isLoading}
-                className="w-full py-4 bg-stone-900 text-stone-100 font-sans text-xs uppercase tracking-[0.2em] transition-colors duration-300 hover:bg-stone-800 disabled:opacity-50"
+                disabled={loading}
+                className="w-full bg-stone-900 text-white text-xs tracking-[0.2em] uppercase py-3.5 hover:bg-stone-800 transition disabled:opacity-50"
               >
-                {isLoading ? 'Preparing Order...' : 'Proceed to Checkout'}
+                {loading ? 'Validating Stock...' : 'Proceed to Stripe Checkout'}
               </button>
             </div>
           )}
