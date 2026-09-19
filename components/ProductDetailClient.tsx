@@ -129,7 +129,25 @@ export default function ProductDetailClient({ product }: { product: Product }) {
               <div><span className="text-stone-400">Height:</span> {product.dimensions.height}</div>
               <div><span className="text-stone-400">Diameter:</span> {product.dimensions.diameter}</div>
               <div><span className="text-stone-400">Weight:</span> {product.dimensions.weight}</div>
+              {product.dimensions.capacity && (
+                <div><span className="text-stone-400">Capacity:</span> {product.dimensions.capacity}</div>
+              )}
             </div>
+
+            {/* Care Instructions */}
+            {product.careInstructions && product.careInstructions.length > 0 && (
+              <div className="mb-8">
+                <h2 className="text-xs uppercase tracking-[0.2em] text-stone-400 mb-3">Care Instructions</h2>
+                <ul className="space-y-1.5 text-xs text-stone-600 font-light">
+                  {product.careInstructions.map((instruction, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="text-stone-200 mt-1">—</span>
+                      <span>{instruction}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
 
           {/* Action Buttons */}

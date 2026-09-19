@@ -66,10 +66,11 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const { id, stock } = await request.json();
+    const body = await request.json();
+    const { id } = body;
 
-    if (!id || stock === undefined || stock < 0) {
-      return NextResponse.json({ error: 'Valid product ID and non-negative stock count are required.' }, { status: 400 });
+    if (!id) {
+      return NextResponse.json({ error: 'Product ID is required.' }, { status: 400 });
     }
 
     const products = await getProducts();
@@ -79,7 +80,36 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Product not found.' }, { status: 404 });
     }
 
-    targetProduct.stock = Number(stock);
+    if (body.stock !== undefined) {
+      if (body.stock < 0) {
+        return NextResponse.json({ error: 'Stock cannot be negative.' }, { status: 400 });
+      }
+      targetProduct.stock = Number(body.stock);
+    }
+
+    if (body.name !== undefined) targetProduct.name = body.name;
+    if (body.japaneseName !== undefined) targetProduct.japaneseName = body.japaneseName;
+    if (body.style !== undefined) targetProduct.style = body.style;
+    if (body.origin !== undefined) targetProduct.origin = body.origin;
+    if (body.price !== undefined) targetProduct.price = Math.round(Number(body.price) * 100);
+    if (body.isOneOfAKind !== undefined) targetProduct.isOneOfAKind = Boolean(body.isOneOfAKind);
+    if (body.description !== undefined) targetProduct.description = body.description;
+    if (body.height !== undefined || body.diameter !== undefined || body.weight !== undefined || body.capacity !== undefined) {
+      targetProduct.dimensions = {
+        height: body.height ?? targetProduct.dimensions.height,
+        diameter: body.diameter ?? targetProduct.dimensions.diameter,
+        weight: body.weight ?? targetProduct.dimensions.weight,
+        capacity: body.capacity ?? targetProduct.dimensions.capacity,
+      };
+    }
+    if (body.careInstructions !== undefined) {
+      targetProduct.careInstructions =
+        typeof body.careInstructions === 'string'
+          ? body.careInstructions.split('\n').filter((l: string) => l.trim().length > 0)
+          : body.careInstructions;
+    }
+    if (body.images !== undefined) targetProduct.images = body.images;
+
     await saveProduct(targetProduct);
 
     revalidatePath('/');
@@ -88,7 +118,7 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ success: true, product: targetProduct });
   } catch (error: any) {
-    console.error('Error modifying stock:', error);
+    console.error('Error updating product:', error);
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
   }
 }
