@@ -1,6 +1,8 @@
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import Stripe from 'stripe';
+import { getProducts, saveProduct } from '@/data/products';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
   apiVersion: '2026-08-26.dahlia',
@@ -40,7 +42,7 @@ export async function POST(req: Request) {
 
     // Retrieve full line item details for fulfillment
     const expandedSession = await stripe.checkout.sessions.retrieve(session.id, {
-      expand: ['line_items', 'customer_details'],
+      expand: ['line_items.data.price.product', 'customer_details'],
     });
 
     const customerEmail = expandedSession.customer_details?.email;
@@ -56,10 +58,29 @@ export async function POST(req: Request) {
     });
     console.log('------------------------------------------\n');
 
-    // Here you would:
-    // 1. Decrement inventory quantities in your database
-    // 2. Mark one-of-a-kind ceramics as "Sold Out"
-    // 3. Trigger email dispatch (e.g. via Resend or SendGrid)
+    // Decrement inventory quantities for each purchased product
+    const products = await getProducts();
+    const productMap = new Map(products.map((p) => [p.id, p]));
+    let touchedSlugs: string[] = [];
+
+    for (const item of items) {
+      const stripeProduct = item.price?.product as Stripe.Product | undefined;
+      const productId = stripeProduct?.metadata?.productId;
+      if (!productId) continue;
+
+      const product = productMap.get(productId);
+      if (!product || product.stock === undefined) continue;
+
+      product.stock = Math.max(0, product.stock - (item.quantity || 1));
+      await saveProduct(product);
+      touchedSlugs.push(product.slug);
+    }
+
+    revalidatePath('/');
+    touchedSlugs.forEach((slug) => revalidatePath(`/products/${slug}`));
+    revalidatePath('/admin');
+
+    // Here you would also trigger email dispatch (e.g. via Resend or SendGrid)
   }
 
   return NextResponse.json({ received: true }, { status: 200 });
