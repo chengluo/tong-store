@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import Stripe from 'stripe';
 import { getProducts, saveProduct } from '@/data/products';
+import { sendOrderConfirmationEmail } from '@/lib/email';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
   apiVersion: '2026-08-26.dahlia',
@@ -61,14 +62,21 @@ export async function POST(req: Request) {
     // Decrement inventory quantities for each purchased product
     const products = await getProducts();
     const productMap = new Map(products.map((p) => [p.id, p]));
-    let touchedSlugs: string[] = [];
+    const touchedSlugs: string[] = [];
+    const emailItems = [];
 
     for (const item of items) {
       const stripeProduct = item.price?.product as Stripe.Product | undefined;
       const productId = stripeProduct?.metadata?.productId;
-      if (!productId) continue;
+      const product = productId ? productMap.get(productId) : undefined;
 
-      const product = productMap.get(productId);
+      emailItems.push({
+        name: product?.name || item.description || 'Ceramic Piece',
+        quantity: item.quantity || 1,
+        unitPrice: item.price?.unit_amount ?? 0,
+        careInstructions: product?.careInstructions,
+      });
+
       if (!product || product.stock === undefined) continue;
 
       product.stock = Math.max(0, product.stock - (item.quantity || 1));
@@ -80,7 +88,14 @@ export async function POST(req: Request) {
     touchedSlugs.forEach((slug) => revalidatePath(`/products/${slug}`));
     revalidatePath('/admin');
 
-    // Here you would also trigger email dispatch (e.g. via Resend or SendGrid)
+    if (customerEmail) {
+      await sendOrderConfirmationEmail({
+        to: customerEmail,
+        orderId: session.id,
+        items: emailItems,
+        totalCents: session.amount_total || 0,
+      });
+    }
   }
 
   return NextResponse.json({ received: true }, { status: 200 });

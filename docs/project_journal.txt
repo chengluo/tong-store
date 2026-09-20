@@ -290,3 +290,52 @@ BLOB_READ_WRITE_TOKEN=vercel_blob_rw_...
 # Upstash Redis Persistence
 UPSTASH_REDIS_REST_URL=[https://...upstash.io](https://...upstash.io)
 UPSTASH_REDIS_REST_TOKEN=AXXX...
+```
+
+---
+
+## Session Update — 2026-09-20: Inventory Management & Admin CMS Rebuild
+
+### A. Cart Type Mismatch Fix
+* **Problem:** `ProductCard.tsx` and `ProductDetailClient.tsx` called `addItem` with an explicit `quantity: 1` field, but `useCartStore`'s `addItem` is typed as `Omit<CartItem, 'quantity'>` since the store sets `quantity` itself (increments existing items, defaults new items to `1`). TypeScript flagged this as an excess-property error (`ts(2353)`).
+* **Fix:** Removed the redundant `quantity: 1` from both call sites.
+
+### B. Inventory Decrement on Checkout Webhook
+* **Problem:** `app/api/webhook/route.ts` logged completed Stripe orders for fulfillment but never decremented product stock — inventory counts never changed after a successful purchase.
+* **Fix:** Expanded the webhook's line-item retrieval to include `line_items.data.price.product`, read the `productId` metadata that `app/api/checkout/route.ts` already attaches to each Stripe product, and decrement matching product stock (clamped at 0) via the existing `saveProduct` helper. Revalidates `/`, the product's detail page, and `/admin` afterward.
+* **Verified:** End-to-end test using the Stripe CLI (`stripe listen --forward-to`) plus a real test-mode Checkout Session completed with test card `4242 4242 4242 4242` — confirmed stock dropped from `1` to `0` after payment, then restored the test product's stock afterward.
+
+### C. Admin CMS: Full-Field Edit Support
+* **Problem:** The admin "Update Ceramic Piece" button silently failed to save most edits. `app/api/products/route.ts`'s `PATCH` handler only ever read `{ id, stock }` from the request body, ignoring name, price, dimensions, care instructions, and every other field the edit form submitted.
+* **Fix:** `PATCH` now applies any field present in the body — converts `price` from dollars to cents (matching the create flow), splits a newline-delimited `careInstructions` string into an array, and merges dimension fields into the `dimensions` object — while still supporting the stock-only `{ id, stock }` calls used by the inline +/- steppers.
+* **Verified:** Simulated the edit form's exact payload shape via `curl`; confirmed description, price, dimensions, and care instructions all persisted correctly, then restored the test product to its original values.
+
+### D. Admin CMS: Restored Missing Form Fields
+The admin product form (`app/admin/page.tsx`) went through several redesign iterations this session (`AdminPage` → `AdminTableDashboard` → `AdminSplitDashboard`). Several fields already existed in component state and were already sent to the API, but had no corresponding input in the JSX — they were silently stuck at their default values. Added:
+* **Dimensions:** Height / Diameter / Weight / Capacity input grid
+* **Care Instructions:** textarea (one instruction per line)
+* **Origin Kiln / Prefecture:** text input
+* **One-of-a-Kind checkbox:** "Unique collector item (One-of-a-Kind)", matching the styling introduced in the earlier `f31b187` commit
+
+### E. Admin CMS: Sold-Out Styling
+* Added a "Sold Out" pill to inventory rows when `stock <= 0`, matching the red pill styling defined in `public/mockup.html` (`.pill-soldout`: `#FEF2F2` background / `#B91C1C` text / `#FECACA` border → Tailwind `bg-red-50 text-red-700 border-red-200`).
+* `public/mockup.html` was added to the repo as a static design reference for the admin CMS rebuild.
+
+### F. Product Detail Page Enhancements
+* Added a **Care Instructions** section to `components/ProductDetailClient.tsx`, rendering each item from `product.careInstructions` as a bulleted list, sized (`text-xs`) to match the adjacent Specifications block.
+* Added a **Capacity** row to the Specifications grid, shown only when `product.dimensions.capacity` is present.
+
+### G. Transactional Order Confirmation Email
+* **Problem:** Buyers only ever saw the receipt at `app/success/page.tsx`. Closing that tab meant no persistent order reference or care-instructions reminder.
+* **Fix:** Added `lib/email.ts` using the `resend` npm package. `sendOrderConfirmationEmail()` builds an itemized HTML receipt (name, quantity, unit price, subtotal, total) with each purchased product's care instructions rendered as a bulleted sub-list. `app/api/webhook/route.ts` calls it after stock decrement, using the customer email Stripe returns on `checkout.session.completed`.
+* **Graceful degradation:** If `RESEND_API_KEY` is unset, the function logs a warning and returns without throwing — matching this codebase's existing fallback pattern for Redis/Blob.
+* **Provider note:** Neither Resend nor Postmark exist in the Stripe Projects service catalog (checked via `stripe projects search`); the closest catalog matches (AgentMail, Customer.io, PostHog, PostalForm) aren't fit for transactional receipts, so Resend was integrated directly as an npm dependency instead.
+* **Verified:** Two end-to-end test-mode checkouts via Stripe CLI + browser (test card `4242 4242 4242 4242`) — first confirmed the graceful skip path with no API key configured, second confirmed no errors were thrown once a real `RESEND_API_KEY`/`RESEND_FROM_EMAIL` were added to `.env.local`. The key is send-only restricted, so delivery couldn't be verified via the API directly, but `resend.emails.send()` completed without error.
+
+---
+
+## 7. Updated Milestones
+
+* ~~Inventory Decrementing~~ — **Resolved.** Stock now decrements automatically via the Stripe webhook (see Section B above).
+* ~~Persistent Order Receipt~~ — **Resolved.** A transactional confirmation email with an itemized receipt and care instructions now sends on `checkout.session.completed` (see Section G above).
+* The admin CMS is mid-redesign; multiple UI variants exist in git history (`app/admin/page.tsx`) — consider consolidating on one final design once the new layout direction is settled.
