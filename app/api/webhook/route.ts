@@ -35,7 +35,7 @@ export async function POST(req: Request) {
       { error: `Webhook Error: ${err.message}` },
       { status: 400 }
     );
-  }
+  } 
 
   // Handle successful checkout payments
   if (event.type === 'checkout.session.completed') {
