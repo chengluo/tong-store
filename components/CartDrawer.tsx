@@ -75,7 +75,7 @@ export default function CartDrawer() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <h4 className="font-serif text-xs text-stone-900 truncate">{item.name}</h4>
-                      <p className="font-mono text-xs text-stone-500 mt-1">${(item.price / 100).toFixed(2)}</p>
+                      <p className="font-mono text-xs text-stone-500 mt-1">£{(item.price / 100).toFixed(2)}</p>
                       
                       <div className="flex items-center gap-3 mt-2">
                         <div className="flex items-center border border-stone-200 bg-white text-xs">
@@ -111,7 +111,7 @@ export default function CartDrawer() {
             <div className="border-t border-stone-200 pt-6">
               <div className="flex justify-between text-xs font-mono mb-4">
                 <span>Subtotal</span>
-                <span>${(total / 100).toFixed(2)}</span>
+                <span>£{(total / 100).toFixed(2)}</span>
               </div>
               <button
                 onClick={handleCheckout}

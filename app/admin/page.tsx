@@ -198,7 +198,7 @@ export default function AdminSplitDashboard() {
                       <div className="min-w-0">
                         <p className="text-xs font-medium text-stone-900 truncate">{p.name}</p>
                         <p className="text-[10px] text-stone-400 uppercase tracking-wider">
-                          {p.style} • ${(p.price / 100).toFixed(2)}
+                          {p.style} • £{(p.price / 100).toFixed(2)}
                         </p>
                       </div>
                     </div>
@@ -285,7 +285,7 @@ export default function AdminSplitDashboard() {
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="block uppercase tracking-wider text-stone-500 mb-1">Price (USD)</label>
+                <label className="block uppercase tracking-wider text-stone-500 mb-1">Price (GBP)</label>
                 <input
                   type="number"
                   step="0.01"

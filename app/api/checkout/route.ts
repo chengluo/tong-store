@@ -39,7 +39,7 @@ export async function POST(request: Request) {
 
       return {
         price_data: {
-          currency: 'usd',
+          currency: 'gbp',
           product_data: {
             name: `${product.name} (${product.japaneseName})`,
             images: formattedImages,
@@ -61,6 +61,30 @@ export async function POST(request: Request) {
       shipping_address_collection: {
         allowed_countries: ['US', 'CA', 'GB', 'FR', 'DE', 'JP', 'AU'],
       },
+      shipping_options: [
+        {
+          shipping_rate_data: {
+            type: 'fixed_amount',
+            fixed_amount: { amount: 800, currency: 'gbp' },
+            display_name: 'Domestic Shipping (UK)',
+            delivery_estimate: {
+              minimum: { unit: 'business_day', value: 2 },
+              maximum: { unit: 'business_day', value: 5 },
+            },
+          },
+        },
+        {
+          shipping_rate_data: {
+            type: 'fixed_amount',
+            fixed_amount: { amount: 2500, currency: 'gbp' },
+            display_name: 'International Shipping',
+            delivery_estimate: {
+              minimum: { unit: 'business_day', value: 7 },
+              maximum: { unit: 'business_day', value: 21 },
+            },
+          },
+        },
+      ],
       success_url: `${process.env.NEXT_PUBLIC_SITE_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.NEXT_PUBLIC_SITE_URL}/`,
     });

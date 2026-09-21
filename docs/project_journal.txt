@@ -330,12 +330,92 @@ The admin product form (`app/admin/page.tsx`) went through several redesign iter
 * **Fix:** Added `lib/email.ts` using the `resend` npm package. `sendOrderConfirmationEmail()` builds an itemized HTML receipt (name, quantity, unit price, subtotal, total) with each purchased product's care instructions rendered as a bulleted sub-list. `app/api/webhook/route.ts` calls it after stock decrement, using the customer email Stripe returns on `checkout.session.completed`.
 * **Graceful degradation:** If `RESEND_API_KEY` is unset, the function logs a warning and returns without throwing — matching this codebase's existing fallback pattern for Redis/Blob.
 * **Provider note:** Neither Resend nor Postmark exist in the Stripe Projects service catalog (checked via `stripe projects search`); the closest catalog matches (AgentMail, Customer.io, PostHog, PostalForm) aren't fit for transactional receipts, so Resend was integrated directly as an npm dependency instead.
-* **Verified:** Two end-to-end test-mode checkouts via Stripe CLI + browser (test card `4242 4242 4242 4242`) — first confirmed the graceful skip path with no API key configured, second confirmed no errors were thrown once a real `RESEND_API_KEY`/`RESEND_FROM_EMAIL` were added to `.env.local`. The key is send-only restricted, so delivery couldn't be verified via the API directly, but `resend.emails.send()` completed without error.
+* **Verified:** Two end-to-end test-mode checkouts via Stripe CLI + browser (test card `4242 4242 4242 4242`) — first confirmed the graceful skip path with no API key configured, second confirmed no errors were thrown once a real `RESEND_API_KEY`/`RESEND_FROM_EMAIL` were added to `.env.local`. The key is send-only restricted, so delivery couldn't be verified via the API directly, but `resend.emails.send()` completed without error. (See Section H for the deliverability follow-up.)
+
+### H. Order Confirmation Email — Deliverability & Reference Format
+* **Problem:** After adding a real `RESEND_API_KEY`, emails were accepted by Resend (`error: null`, valid message ID) but never arrived — not even in Gmail spam.
+* **Root cause:** `appos.co.uk`'s SPF record (`v=spf1 include:spf.protection.outlook.com -all`) only authorized Microsoft 365 to send as the domain and hard-failed everyone else, including Resend's mail servers. DKIM was already correctly configured for Resend, but the conflicting SPF hard-fail caused Gmail to silently discard the message post-handoff rather than route it to spam.
+* **Fix:** Added `include:send.forge.rmta.net` (Resend's SPF include, from the Resend dashboard's domain verification screen) to the existing SPF TXT record on GoDaddy, combining it with the existing Outlook include rather than replacing it:
+  `v=spf1 include:spf.protection.outlook.com include:send.forge.rmta.net -all`
+* **Verified:** A retest email after DNS propagation was confirmed delivered in the Resend dashboard and arrived in the recipient's Gmail inbox.
+* **Remaining gap:** `_dmarc.appos.co.uk` still has no DMARC record. Not currently blocking delivery, but recommended for long-term sender reputation (a permissive `v=DMARC1; p=none;` policy is a safe starting point).
+* **Separate finding — local webhook testing:** A real checkout completed through the actual `localhost:3000` site (not via the CLI/API test scripts) produced no email and no stock decrement. Cause: `stripe listen --forward-to localhost:3000/api/webhook` wasn't running. Stripe cannot deliver webhook events to a local machine without that CLI tunnel active — this is expected local-dev behavior, not a bug, and doesn't affect production (Stripe delivers directly to `https://www.appos.co.uk/api/webhook`).
+* **Order reference format:** The email subject/heading originally showed the raw Stripe Checkout Session ID (e.g. `cs_test_a1C8Ojs...`), which reads as an internal ID rather than a customer-facing order number. Added `formatOrderReference()` in `lib/email.ts`, which strips the `cs_test_`/`cs_live_` prefix and formats the last 5 characters as `ORDER-XXXXX` (e.g. `ORDER-EVSQU`). The full Stripe session ID is still included lower in the email body as "Transaction ID" for support lookups.
 
 ---
 
 ## 7. Updated Milestones
 
 * ~~Inventory Decrementing~~ — **Resolved.** Stock now decrements automatically via the Stripe webhook (see Section B above).
-* ~~Persistent Order Receipt~~ — **Resolved.** A transactional confirmation email with an itemized receipt and care instructions now sends on `checkout.session.completed` (see Section G above).
+* ~~Persistent Order Receipt~~ — **Resolved.** A transactional confirmation email with an itemized receipt and care instructions now sends on `checkout.session.completed` (see Sections G–H above).
+* ~~Order Email Deliverability~~ — **Resolved.** SPF record fixed to include Resend's sending servers alongside the existing Outlook entry (see Section H above).
+* Consider adding a DMARC record (`_dmarc.appos.co.uk`) for stronger long-term sender reputation.
 * The admin CMS is mid-redesign; multiple UI variants exist in git history (`app/admin/page.tsx`) — consider consolidating on one final design once the new layout direction is settled.
+
+---
+
+## 8. Common CLI Commands
+
+### Project Setup & Development
+```
+npm install
+npm run dev
+npm run build
+npm run start
+npm run lint
+npx tsc --noEmit
+rm -rf .next
+```
+
+### Adding Dependencies
+```
+npm install resend
+```
+
+### Git
+```
+git status
+git diff
+git log --oneline
+git add <file>
+git commit -m "message"
+git push
+```
+
+### Stripe CLI — Setup
+```
+stripe --version
+stripe login
+stripe config --list
+```
+
+### Stripe CLI — Local Webhook Testing
+```
+stripe listen --forward-to localhost:3000/api/webhook
+stripe listen --forward-to localhost:3000/api/webhook --events checkout.session.completed
+stripe listen --print-secret
+stripe trigger checkout.session.completed
+```
+
+### Stripe CLI — Projects (Service Provisioning)
+```
+stripe plugin install projects
+stripe projects search <query> --json
+stripe projects catalog --json
+stripe projects status --json
+```
+
+### DNS / Email Deliverability Diagnostics
+```
+dig +short TXT appos.co.uk
+dig +short TXT _dmarc.appos.co.uk
+dig +short TXT resend._domainkey.appos.co.uk
+dig +short MX appos.co.uk
+```
+
+### Manual API Testing (local dev server)
+```
+curl http://localhost:3000/api/products
+curl -X POST http://localhost:3000/api/checkout -H "Content-Type: application/json" -d '{"items":[{"id":"<product-id>","quantity":1}]}'
+curl -X PATCH http://localhost:3000/api/products -H "Content-Type: application/json" -d '{"id":"<product-id>","stock":1}'
+```

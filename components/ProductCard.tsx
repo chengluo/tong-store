@@ -77,7 +77,7 @@ export default function ProductCard({ product }: ProductCardProps) {
           <p className="text-stone-400 mt-0.5 font-light">{product.style}</p>
         </div>
         <div className="text-right">
-          <p className="font-mono text-stone-800">${(product.price / 100).toFixed(2)}</p>
+          <p className="font-mono text-stone-800">£{(product.price / 100).toFixed(2)}</p>
           {isOutOfStock && (
             <p className="text-[10px] uppercase tracking-wider text-stone-400 mt-0.5">Unavailable</p>
           )}

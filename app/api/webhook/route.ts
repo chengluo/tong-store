@@ -52,7 +52,7 @@ export async function POST(req: Request) {
     console.log('\n--- 📦 ORDER RECEIVED FOR FULFILLMENT ---');
     console.log(`Order ID: ${session.id}`);
     console.log(`Customer: ${customerEmail}`);
-    console.log(`Total Paid: $${((session.amount_total || 0) / 100).toFixed(2)}`);
+    console.log(`Total Paid: £${((session.amount_total || 0) / 100).toFixed(2)}`);
     console.log('Items to pack & dispatch:');
     items.forEach((item) => {
       console.log(`  • ${item.quantity}x ${item.description}`);

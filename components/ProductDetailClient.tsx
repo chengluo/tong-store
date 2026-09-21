@@ -111,7 +111,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
             </h1>
 
             <div className="flex items-baseline gap-4 mb-6">
-              <span className="font-mono text-xl text-stone-900">${(product.price / 100).toFixed(2)}</span>
+              <span className="font-mono text-xl text-stone-900">£{(product.price / 100).toFixed(2)}</span>
               {isOutOfStock ? (
                 <span className="text-xs uppercase tracking-widest text-red-600 font-medium">Currently Sold Out</span>
               ) : product.stock !== undefined && product.stock <= 3 ? (

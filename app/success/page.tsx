@@ -96,7 +96,7 @@ export default async function SuccessPage(props: SuccessPageProps) {
                   <p className="text-xs text-stone-500 font-light">Quantity: {item.quantity}</p>
                 </div>
                 <span className="text-stone-800 font-mono text-xs">
-                  ${((item.amount_total || 0) / 100).toFixed(2)}
+                  £{((item.amount_total || 0) / 100).toFixed(2)}
                 </span>
               </div>
             ))}
@@ -107,7 +107,7 @@ export default async function SuccessPage(props: SuccessPageProps) {
         <section className="py-6 border-b border-stone-200/60 flex justify-between items-baseline font-sans">
           <span className="text-xs uppercase tracking-[0.2em] text-stone-500">Total Settled</span>
           <span className="text-lg font-serif text-stone-900">
-            ${totalAmount.toFixed(2)}
+            £{totalAmount.toFixed(2)}
           </span>
         </section>
 
