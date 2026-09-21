@@ -1,5 +1,3 @@
-mkdir -p my-app/docs
-cat << 'EOF' > my-app/docs/project_journal.txt
 # Project Documentation: Komorebi Kiln (Japanese Porcelain E-Commerce)
 
 An artisanal e-commerce storefront for handcrafted Japanese ceramics and porcelain (Arita-yaki, Hasami, Mino-ware, Kutani, and Bizen). Built with a minimalist Japanese aesthetic (warm stone tones, serif typography, negative space) and an integrated Stripe payment pipeline.

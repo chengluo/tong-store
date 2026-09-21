@@ -148,6 +148,12 @@ export default function AdminSplitDashboard() {
             + New Piece
           </button>
           <Link
+            href="/admin/orders"
+            className="text-xs uppercase tracking-widest border border-stone-300 px-4 py-2 hover:bg-stone-100 transition"
+          >
+            Orders
+          </Link>
+          <Link
             href="/"
             className="text-xs uppercase tracking-widest border border-stone-300 px-4 py-2 hover:bg-stone-100 transition"
           >

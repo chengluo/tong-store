@@ -3,7 +3,9 @@ import { NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import Stripe from 'stripe';
 import { getProducts, saveProduct } from '@/data/products';
+import { saveOrder } from '@/data/orders';
 import { sendOrderConfirmationEmail } from '@/lib/email';
+import type { Order, OrderItem } from '@/types/order';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
   apiVersion: '2026-08-26.dahlia',
@@ -71,6 +73,7 @@ export async function POST(req: Request) {
       const product = productId ? productMap.get(productId) : undefined;
 
       emailItems.push({
+        productId,
         name: product?.name || item.description || 'Ceramic Piece',
         quantity: item.quantity || 1,
         unitPrice: item.price?.unit_amount ?? 0,
@@ -87,6 +90,47 @@ export async function POST(req: Request) {
     revalidatePath('/');
     touchedSlugs.forEach((slug) => revalidatePath(`/products/${slug}`));
     revalidatePath('/admin');
+    revalidatePath('/admin/orders');
+
+    // Persist the order for the admin dashboard
+    const shippingDetails = expandedSession.collected_information?.shipping_details;
+    const orderItems: OrderItem[] = emailItems.map(({ productId, name, quantity, unitPrice }) => ({
+      productId,
+      name,
+      quantity,
+      unitPrice,
+    }));
+
+    const order: Order = {
+      id: session.id,
+      paymentIntentId:
+        typeof expandedSession.payment_intent === 'string'
+          ? expandedSession.payment_intent
+          : expandedSession.payment_intent?.id ?? null,
+      customerEmail: customerEmail ?? null,
+      customerName: expandedSession.customer_details?.name ?? null,
+      shippingAddress: shippingDetails
+        ? {
+            name: shippingDetails.name,
+            line1: shippingDetails.address.line1,
+            line2: shippingDetails.address.line2,
+            city: shippingDetails.address.city,
+            state: shippingDetails.address.state,
+            postalCode: shippingDetails.address.postal_code,
+            country: shippingDetails.address.country,
+          }
+        : null,
+      items: orderItems,
+      amountSubtotal: expandedSession.amount_subtotal || 0,
+      shippingAmount: expandedSession.shipping_cost?.amount_total || 0,
+      amountTotal: expandedSession.amount_total || 0,
+      currency: expandedSession.currency || 'gbp',
+      paymentStatus: expandedSession.payment_status,
+      fulfillmentStatus: 'processing',
+      createdAt: session.created * 1000,
+    };
+
+    await saveOrder(order);
 
     if (customerEmail) {
       await sendOrderConfirmationEmail({

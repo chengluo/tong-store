@@ -1,11 +1,7 @@
 import { Resend } from 'resend';
+import { formatOrderReference } from '@/lib/orderRef';
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
-
-function formatOrderReference(sessionId: string): string {
-  const stripped = sessionId.replace(/^cs_(test|live)_/, '');
-  return `Order No.${stripped.slice(-5).toUpperCase()}`;
-}
 
 interface OrderEmailItem {
   name: string;
