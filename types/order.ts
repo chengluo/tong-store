@@ -1,5 +1,5 @@
 // types/order.ts
-export type FulfillmentStatus = 'processing' | 'shipped' | 'delivered';
+export type FulfillmentStatus = 'processing' | 'shipped' | 'delivered' | 'canceled';
 
 export interface OrderItem {
   productId?: string;

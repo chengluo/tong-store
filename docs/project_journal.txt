@@ -417,3 +417,33 @@ curl http://localhost:3000/api/products
 curl -X POST http://localhost:3000/api/checkout -H "Content-Type: application/json" -d '{"items":[{"id":"<product-id>","quantity":1}]}'
 curl -X PATCH http://localhost:3000/api/products -H "Content-Type: application/json" -d '{"id":"<product-id>","stock":1}'
 ```
+
+---
+
+## 9. Inventory Race-Condition Protection (Atomic Stock Reservation)
+
+### A. The Problem
+For one-of-a-kind pieces (`stock: 1`), two buyers opening checkout at the same moment could both pass the old "is it in stock?" pre-check and both complete payment — the item would be oversold and one buyer would be charged for a piece that no longer exists. The old flow decremented stock via a plain read-modify-write (`saveProduct`) inside the webhook, which is not atomic against a second concurrent webhook call for the same product.
+
+### B. The Fix — Authorize-then-Capture + Atomic Reservation
+* **`app/api/checkout/route.ts`:** Checkout Sessions now set `payment_intent_data: { capture_method: 'manual' }`. This only *authorizes* the card at checkout — no money moves yet. The existing soft stock check here is unchanged (still a fast, non-authoritative early exit for the obviously-sold-out case).
+* **`data/products.ts` — `reserveStock()`:** A new function that atomically checks and decrements stock for a batch of `{id, quantity}` reservations in a single Redis-side Lua script (`EVAL`). The script reads the current products JSON blob, verifies every requested item still has enough stock, and only if *all* checks pass does it write the decremented values back — all inside one atomic Redis operation, so a second concurrent call physically cannot observe or act on a half-updated state. Falls back to a best-effort (non-atomic) check when Redis isn't configured, matching this codebase's existing local-dev degradation pattern.
+* **`app/api/webhook/route.ts`:** On `checkout.session.completed`, the handler now calls `reserveStock()` *before* touching the payment:
+  - **Reservation succeeds:** `stripe.paymentIntents.capture()` — the card is charged now, for the first time. Proceeds with the existing order save + confirmation email flow.
+  - **Reservation fails** (lost the race): `stripe.paymentIntents.cancel()` releases the authorization — **the customer is never charged**, not even for a moment. Saves the order with `paymentStatus: 'canceled'` / `fulfillmentStatus: 'canceled'` for admin visibility, and sends a new apology email (see below) instead of the normal receipt.
+* **`lib/email.ts` — `sendSoldOutCancellationEmail()`:** New email template explaining the piece sold out to another buyer moments earlier, that no charge occurred, and that any temporary bank hold will clear on its own.
+* **`types/order.ts` / `app/admin/orders/page.tsx`:** Added `'canceled'` to `FulfillmentStatus`. Canceled orders render as a static red "canceled (sold out)" badge in the orders table instead of the editable status dropdown.
+
+### C. Verified
+Isolated test: fired two concurrent `reserveStock()` calls at a product with `stock: 1`. Result: exactly one call returned `{success: true}`, the other `{success: false, reason: 'insufficient_stock'}`, and the final stored stock was precisely `0` — never negative, never double-decremented. This confirms the atomic reservation logic itself is correct.
+
+### D. Debugging Note — A Red Herring From Production
+Real end-to-end checkout tests (via `stripe listen` + a live browser payment) kept showing stock already at `0` by the time the webhook checked it, even immediately after confirming `stock: 1` seconds earlier, even on a freshly restarted dev server with freshly reset data, and even with retries. After exhaustive isolation (ruling out duplicate webhook delivery, duplicate server processes, stale connections, Redis TTL/expiry, and Next.js caching), the cause was found via `stripe webhook_endpoints list`:
+
+```
+url: "https://www.appos.co.uk/api/webhook"
+status: "enabled"
+enabled_events: ["checkout.session.completed"]
+```
+
+A **permanent Stripe webhook endpoint already exists, pointing at the live production site**, sharing the same Upstash Redis database as local dev. Every local test checkout fired the event to *both* `stripe listen` (local, new atomic-reservation code) *and* production (older, already-deployed code that decrements stock unconditionally) simultaneously — the two deployments raced on the same Redis key, and production's simpler/faster code usually won, zeroing out stock before the local handler's own check ran. This was never a bug in the new reservation logic. **Anyone testing checkout locally against this Stripe account should be aware that production's webhook will also fire on every test-mode checkout.**

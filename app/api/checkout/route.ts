@@ -58,6 +58,11 @@ export async function POST(request: Request) {
       payment_method_types: ['card'],
       line_items,
       mode: 'payment',
+      payment_intent_data: {
+        // Authorize only; the webhook captures after an atomic stock re-check
+        // so two simultaneous buyers of the last unit can never both be charged.
+        capture_method: 'manual',
+      },
       shipping_address_collection: {
         allowed_countries: ['US', 'CA', 'GB', 'FR', 'DE', 'JP', 'AU'],
       },

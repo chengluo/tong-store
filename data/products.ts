@@ -71,3 +71,86 @@ export async function saveProduct(newProduct: Product): Promise<Product[]> {
 }
 
 export const saveProducts = saveProduct;
+
+export interface StockReservation {
+  id: string;
+  quantity: number;
+}
+
+export interface ReserveStockResult {
+  success: boolean;
+  reason?: 'no_data' | 'not_found' | 'insufficient_stock';
+  productId?: string;
+}
+
+// Atomically checks and decrements stock for every reservation in one Redis-side
+// Lua script, so two concurrent buyers can never both "win" the last unit.
+const RESERVE_STOCK_SCRIPT = `
+local raw = redis.call('GET', KEYS[1])
+if not raw then
+  return cjson.encode({ success = false, reason = 'no_data' })
+end
+local products = cjson.decode(raw)
+local reservations = cjson.decode(ARGV[1])
+
+for i = 1, #reservations do
+  local res = reservations[i]
+  local found = false
+  for j = 1, #products do
+    if products[j].id == res.id then
+      found = true
+      if products[j].stock ~= nil and products[j].stock < res.quantity then
+        return cjson.encode({ success = false, reason = 'insufficient_stock', productId = res.id })
+      end
+    end
+  end
+  if not found then
+    return cjson.encode({ success = false, reason = 'not_found', productId = res.id })
+  end
+end
+
+for i = 1, #reservations do
+  local res = reservations[i]
+  for j = 1, #products do
+    if products[j].id == res.id and products[j].stock ~= nil then
+      products[j].stock = products[j].stock - res.quantity
+    end
+  end
+end
+
+redis.call('SET', KEYS[1], cjson.encode(products))
+return cjson.encode({ success = true })
+`;
+
+export async function reserveStock(reservations: StockReservation[]): Promise<ReserveStockResult> {
+  if (reservations.length === 0) return { success: true };
+
+  if (!redis) {
+    // No Redis configured (local dev only) — best-effort, non-atomic fallback.
+    const products = await getProducts();
+    for (const res of reservations) {
+      const product = products.find((p) => p.id === res.id);
+      if (!product) return { success: false, reason: 'not_found', productId: res.id };
+      if (product.stock !== undefined && product.stock < res.quantity) {
+        return { success: false, reason: 'insufficient_stock', productId: res.id };
+      }
+    }
+    for (const res of reservations) {
+      const product = products.find((p) => p.id === res.id)!;
+      if (product.stock !== undefined) product.stock -= res.quantity;
+    }
+    return { success: true };
+  }
+
+  try {
+    const result = await redis.eval(
+      RESERVE_STOCK_SCRIPT,
+      [KV_KEY],
+      [JSON.stringify(reservations)]
+    );
+    return (typeof result === 'string' ? JSON.parse(result) : result) as ReserveStockResult;
+  } catch (err) {
+    console.error('Atomic stock reservation failed:', err);
+    return { success: false, reason: 'no_data' };
+  }
+}

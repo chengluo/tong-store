@@ -12,11 +12,13 @@ const STATUS_STYLES: Record<FulfillmentStatus, string> = {
   processing: 'bg-amber-50 text-amber-700 border-amber-200',
   shipped: 'bg-blue-50 text-blue-700 border-blue-200',
   delivered: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  canceled: 'bg-red-50 text-red-700 border-red-200',
 };
 
 const PAYMENT_STYLES: Record<string, string> = {
   paid: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   unpaid: 'bg-red-50 text-red-700 border-red-200',
+  canceled: 'bg-stone-100 text-stone-600 border-stone-200',
   no_payment_required: 'bg-stone-100 text-stone-600 border-stone-200',
 };
 
@@ -147,20 +149,29 @@ export default function AdminOrdersPage() {
                     </span>
                   </td>
                   <td className="py-3 px-4">
-                    <select
-                      value={order.fulfillmentStatus}
-                      disabled={updatingId === order.id}
-                      onChange={(e) =>
-                        handleStatusChange(order.id, e.target.value as FulfillmentStatus)
-                      }
-                      className={`text-[10px] uppercase tracking-wider px-2 py-1 border rounded-xs outline-hidden disabled:opacity-50 ${STATUS_STYLES[order.fulfillmentStatus]}`}
-                    >
-                      {STATUS_OPTIONS.map((status) => (
-                        <option key={status} value={status}>
-                          {status}
-                        </option>
-                      ))}
-                    </select>
+                    {order.fulfillmentStatus === 'canceled' ? (
+                      <span
+                        className={`inline-block text-[10px] uppercase tracking-wider px-2 py-1 border rounded-xs ${STATUS_STYLES.canceled}`}
+                        title="Payment authorization was released — the customer was not charged."
+                      >
+                        canceled (sold out)
+                      </span>
+                    ) : (
+                      <select
+                        value={order.fulfillmentStatus}
+                        disabled={updatingId === order.id}
+                        onChange={(e) =>
+                          handleStatusChange(order.id, e.target.value as FulfillmentStatus)
+                        }
+                        className={`text-[10px] uppercase tracking-wider px-2 py-1 border rounded-xs outline-hidden disabled:opacity-50 ${STATUS_STYLES[order.fulfillmentStatus]}`}
+                      >
+                        {STATUS_OPTIONS.map((status) => (
+                          <option key={status} value={status}>
+                            {status}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </td>
                 </tr>
               ))}

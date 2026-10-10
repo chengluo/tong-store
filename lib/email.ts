@@ -81,3 +81,50 @@ export async function sendOrderConfirmationEmail({
     console.error('Failed to send order confirmation email:', err);
   }
 }
+
+interface SoldOutEmailParams {
+  to: string;
+  orderId: string;
+  itemName: string;
+}
+
+// Sent when a race between simultaneous buyers means this order lost the
+// atomic stock check after authorization — the card is never charged.
+export async function sendSoldOutCancellationEmail({ to, orderId, itemName }: SoldOutEmailParams) {
+  if (!resend) {
+    console.warn('RESEND_API_KEY not set — skipping sold-out cancellation email.');
+    return;
+  }
+
+  const orderRef = formatOrderReference(orderId);
+
+  const html = `
+    <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#1C1917;background:#FAF8F5;padding:32px;">
+      <h1 style="font-weight:300;font-size:22px;margin:0 0 4px;">We're sorry — this piece just sold out</h1>
+      <p style="color:#78716C;font-size:12px;letter-spacing:0.05em;margin:0 0 24px;">Order Reference: ${orderRef}</p>
+      <p style="font-size:14px;line-height:1.6;">
+        "${itemName}" was a one-of-a-kind piece, and another collector's order was confirmed moments before yours.
+        Your payment authorization has been released — <strong>you have not been charged</strong>, and no funds
+        will leave your account. Any temporary hold your bank may have shown will clear on its own within a few
+        business days.
+      </p>
+      <p style="color:#78716C;font-size:12px;margin-top:32px;line-height:1.6;">
+        We're sorry for the disappointment. Please browse the collection again — new pieces are added often.
+      </p>
+      <p style="color:#A8A29E;font-size:10px;margin-top:16px;">
+         Transaction ID: ${orderId}
+      </p>
+    </div>
+  `;
+
+  try {
+    await resend.emails.send({
+      from: process.env.RESEND_FROM_EMAIL || 'Komorebi Kiln <onboarding@resend.dev>',
+      to,
+      subject: `Sold Out — ${orderRef} Not Charged`,
+      html,
+    });
+  } catch (err) {
+    console.error('Failed to send sold-out cancellation email:', err);
+  }
+}

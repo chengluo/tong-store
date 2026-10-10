@@ -2,9 +2,9 @@ import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import Stripe from 'stripe';
-import { getProducts, saveProduct } from '@/data/products';
+import { getProducts, reserveStock } from '@/data/products';
 import { saveOrder } from '@/data/orders';
-import { sendOrderConfirmationEmail } from '@/lib/email';
+import { sendOrderConfirmationEmail, sendSoldOutCancellationEmail } from '@/lib/email';
 import type { Order, OrderItem } from '@/types/order';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
@@ -61,11 +61,16 @@ export async function POST(req: Request) {
     });
     console.log('------------------------------------------\n');
 
-    // Decrement inventory quantities for each purchased product
+    const paymentIntentId =
+      typeof expandedSession.payment_intent === 'string'
+        ? expandedSession.payment_intent
+        : expandedSession.payment_intent?.id ?? null;
+
+    // Build line-item details and the stock reservations they require
     const products = await getProducts();
     const productMap = new Map(products.map((p) => [p.id, p]));
-    const touchedSlugs: string[] = [];
     const emailItems = [];
+    const reservations: { id: string; quantity: number }[] = [];
 
     for (const item of items) {
       const stripeProduct = item.price?.product as Stripe.Product | undefined;
@@ -80,19 +85,11 @@ export async function POST(req: Request) {
         careInstructions: product?.careInstructions,
       });
 
-      if (!product || product.stock === undefined) continue;
-
-      product.stock = Math.max(0, product.stock - (item.quantity || 1));
-      await saveProduct(product);
-      touchedSlugs.push(product.slug);
+      if (product && product.stock !== undefined) {
+        reservations.push({ id: product.id, quantity: item.quantity || 1 });
+      }
     }
 
-    revalidatePath('/');
-    touchedSlugs.forEach((slug) => revalidatePath(`/products/${slug}`));
-    revalidatePath('/admin');
-    revalidatePath('/admin/orders');
-
-    // Persist the order for the admin dashboard
     const shippingDetails = expandedSession.collected_information?.shipping_details;
     const orderItems: OrderItem[] = emailItems.map(({ productId, name, quantity, unitPrice }) => ({
       productId,
@@ -101,12 +98,9 @@ export async function POST(req: Request) {
       unitPrice,
     }));
 
-    const order: Order = {
+    const baseOrder: Omit<Order, 'paymentStatus' | 'fulfillmentStatus'> = {
       id: session.id,
-      paymentIntentId:
-        typeof expandedSession.payment_intent === 'string'
-          ? expandedSession.payment_intent
-          : expandedSession.payment_intent?.id ?? null,
+      paymentIntentId,
       customerEmail: customerEmail ?? null,
       customerName: expandedSession.customer_details?.name ?? null,
       shippingAddress: shippingDetails
@@ -125,20 +119,66 @@ export async function POST(req: Request) {
       shippingAmount: expandedSession.shipping_cost?.amount_total || 0,
       amountTotal: expandedSession.amount_total || 0,
       currency: expandedSession.currency || 'gbp',
-      paymentStatus: expandedSession.payment_status,
-      fulfillmentStatus: 'processing',
       createdAt: session.created * 1000,
     };
 
-    await saveOrder(order);
+    // Atomically re-check and reserve stock right before capturing payment —
+    // this is what prevents two simultaneous buyers from both winning the
+    // last unit of a one-of-a-kind piece.
+    const reservation = await reserveStock(reservations);
 
-    if (customerEmail) {
-      await sendOrderConfirmationEmail({
-        to: customerEmail,
-        orderId: session.id,
-        items: emailItems,
-        totalCents: session.amount_total || 0,
+    if (reservation.success) {
+      if (paymentIntentId) {
+        await stripe.paymentIntents.capture(paymentIntentId);
+      }
+
+      revalidatePath('/');
+      reservations.forEach((r) => {
+        const product = productMap.get(r.id);
+        if (product) revalidatePath(`/products/${product.slug}`);
       });
+      revalidatePath('/admin');
+      revalidatePath('/admin/orders');
+
+      await saveOrder({
+        ...baseOrder,
+        paymentStatus: 'paid',
+        fulfillmentStatus: 'processing',
+      });
+
+      if (customerEmail) {
+        await sendOrderConfirmationEmail({
+          to: customerEmail,
+          orderId: session.id,
+          items: emailItems,
+          totalCents: session.amount_total || 0,
+        });
+      }
+    } else {
+      console.warn(
+        `Stock reservation failed for session ${session.id} (product: ${reservation.productId}, reason: ${reservation.reason}). Releasing payment authorization.`
+      );
+
+      if (paymentIntentId) {
+        await stripe.paymentIntents.cancel(paymentIntentId);
+      }
+
+      revalidatePath('/admin/orders');
+
+      await saveOrder({
+        ...baseOrder,
+        paymentStatus: 'canceled',
+        fulfillmentStatus: 'canceled',
+      });
+
+      if (customerEmail) {
+        const soldOutItem = emailItems.find((i) => i.productId === reservation.productId);
+        await sendSoldOutCancellationEmail({
+          to: customerEmail,
+          orderId: session.id,
+          itemName: soldOutItem?.name || 'this item',
+        });
+      }
     }
   }
 
